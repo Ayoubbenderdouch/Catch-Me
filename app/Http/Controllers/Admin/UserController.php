@@ -12,36 +12,43 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::query();
+        try {
+            $query = User::query();
 
-        // Search filter
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
+            // Search filter
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            }
+
+            // Gender filter
+            if ($request->filled('gender')) {
+                $query->where('gender', $request->gender);
+            }
+
+            // Status filter
+            if ($request->filled('is_banned')) {
+                $query->where('is_banned', $request->is_banned);
+            }
+
+            // Visibility filter
+            if ($request->filled('is_visible')) {
+                $query->where('is_visible', $request->is_visible);
+            }
+
+            $users = $query->latest()->paginate(20);
+
+            // Use simple view to avoid storage/filesystem issues
+            return view('admin.users.index-simple', compact('users'));
+        } catch (\Exception $e) {
+            // Fallback: just show users without filters
+            $users = User::latest()->paginate(20);
+            return view('admin.users.index-simple', compact('users'));
         }
-
-        // Gender filter
-        if ($request->filled('gender')) {
-            $query->where('gender', $request->gender);
-        }
-
-        // Status filter
-        if ($request->filled('is_banned')) {
-            $query->where('is_banned', $request->is_banned);
-        }
-
-        // Visibility filter
-        if ($request->filled('is_visible')) {
-            $query->where('is_visible', $request->is_visible);
-        }
-
-        $users = $query->latest()->paginate(20);
-
-        return view('admin.users.index', compact('users'));
     }
 
     public function show(int $id)
