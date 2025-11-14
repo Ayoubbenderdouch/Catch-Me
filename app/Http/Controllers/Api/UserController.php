@@ -102,8 +102,9 @@ class UserController extends Controller
             ], 400);
         }
 
-        // Get configured disk (s3 in production, public for local dev)
-        $disk = config('filesystems.default');
+        // ALWAYS use 'public' disk to ensure images are accessible via /storage/ URL
+        // The 'public' disk stores in storage/app/public which is symlinked to public/storage
+        $disk = 'public';
 
         // Upload new image
         $path = $request->file('image')->store('profile-images', $disk);
@@ -151,7 +152,8 @@ class UserController extends Controller
         }
 
         $user = $request->user();
-        $disk = config('filesystems.default');
+        // ALWAYS use 'public' disk
+        $disk = 'public';
 
         // Delete old profile image from storage if exists
         if ($user->profile_image) {
@@ -212,7 +214,8 @@ class UserController extends Controller
         $photoUrl = $photos[$index];
 
         // Extract path from URL for storage deletion
-        $disk = config('filesystems.default');
+        // ALWAYS use 'public' disk
+        $disk = 'public';
         $urlPath = parse_url($photoUrl, PHP_URL_PATH);
         $storagePath = str_replace('/storage/', '', $urlPath);
 
