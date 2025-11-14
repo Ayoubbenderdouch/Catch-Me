@@ -182,10 +182,19 @@ class LocationService
 
     /**
      * Check if PostGIS extension is available
+     * PostGIS is only available on PostgreSQL, not MySQL
      */
     protected function hasPostGIS(): bool
     {
         try {
+            // Check if we're using PostgreSQL
+            $driver = config('database.default');
+            $connection = config("database.connections.{$driver}.driver");
+
+            if ($connection !== 'pgsql') {
+                return false; // PostGIS only works with PostgreSQL
+            }
+
             $result = \DB::select("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'postgis') as has_postgis");
             return $result[0]->has_postgis ?? false;
         } catch (\Exception $e) {

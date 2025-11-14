@@ -38,22 +38,27 @@ class LocationCacheService
             return false;
         }
 
-        // Store in Redis with 5-minute TTL (300 seconds)
-        $locationData = json_encode([
-            'user_id' => $userId,
-            'latitude' => $latitude,
-            'longitude' => $longitude,
-            'updated_at' => time(),
-        ]);
+        try {
+            // Store in Redis with 5-minute TTL (300 seconds)
+            $locationData = json_encode([
+                'user_id' => $userId,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'updated_at' => time(),
+            ]);
 
-        Redis::setex("user:location:{$userId}", 300, $locationData);
+            Redis::setex("user:location:{$userId}", 300, $locationData);
 
-        // Also update user's last_active_at in Redis
-        Redis::setex("user:active:{$userId}", 1800, now()->toDateTimeString()); // 30 min
+            // Also update user's last_active_at in Redis
+            Redis::setex("user:active:{$userId}", 1800, now()->toDateTimeString()); // 30 min
 
-        // Queue job to sync to PostgreSQL database (async, not blocking!)
-        \App\Jobs\SyncLocationToDatabase::dispatch($userId, $latitude, $longitude)
-            ->delay(now()->addSeconds(30)); // Batch updates every 30 seconds
+            // Queue job to sync to database (async, not blocking!)
+            \App\Jobs\SyncLocationToDatabase::dispatch($userId, $latitude, $longitude)
+                ->delay(now()->addSeconds(30)); // Batch updates every 30 seconds
+        } catch (\Exception $e) {
+            // Fallback to direct database update if Redis is not available
+            return $this->locationService->updateUserLocation($userId, $latitude, $longitude);
+        }
 
         return true;
     }
@@ -66,10 +71,14 @@ class LocationCacheService
      */
     public function getLocation(int $userId): ?array
     {
-        $cached = Redis::get("user:location:{$userId}");
+        try {
+            $cached = Redis::get("user:location:{$userId}");
 
-        if ($cached) {
-            return json_decode($cached, true);
+            if ($cached) {
+                return json_decode($cached, true);
+            }
+        } catch (\Exception $e) {
+            // Redis not available, use database fallback
         }
 
         // Fallback to database
@@ -102,19 +111,29 @@ class LocationCacheService
         int $radiusInMeters = 50,
         ?int $excludeUserId = null
     ): Collection {
-        // Create unique cache key based on location + radius
-        $cacheKey = "nearby:" . round($latitude, 4) . ":" . round($longitude, 4) . ":{$radiusInMeters}";
+        try {
+            // Create unique cache key based on location + radius
+            $cacheKey = "nearby:" . round($latitude, 4) . ":" . round($longitude, 4) . ":{$radiusInMeters}";
 
-        // Cache nearby users for 30 seconds (balance between freshness and performance)
-        return Cache::remember($cacheKey, 30, function () use ($latitude, $longitude, $radiusInMeters, $excludeUserId) {
-            // Use LocationService (PostGIS or Haversine)
+            // Cache nearby users for 30 seconds (balance between freshness and performance)
+            return Cache::remember($cacheKey, 30, function () use ($latitude, $longitude, $radiusInMeters, $excludeUserId) {
+                // Use LocationService (PostGIS or Haversine)
+                return $this->locationService->findNearbyUsers(
+                    $latitude,
+                    $longitude,
+                    $radiusInMeters,
+                    $excludeUserId
+                );
+            });
+        } catch (\Exception $e) {
+            // If caching fails, return results directly without cache
             return $this->locationService->findNearbyUsers(
                 $latitude,
                 $longitude,
                 $radiusInMeters,
                 $excludeUserId
             );
-        });
+        }
     }
 
     /**
