@@ -123,9 +123,13 @@ class UserController extends Controller
         $user = User::findOrFail($id);
         $userName = $user->name;
 
-        // Delete profile image
+        // Delete profile image - use public_direct disk explicitly
         if ($user->profile_image) {
-            Storage::disk(config('filesystems.default'))->delete($user->profile_image);
+            try {
+                Storage::disk('public_direct')->delete($user->profile_image);
+            } catch (\Exception $e) {
+                // Ignore if file doesn't exist
+            }
         }
 
         $user->delete();
