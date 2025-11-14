@@ -41,6 +41,9 @@ environments:
       APP_ENV: production
       APP_DEBUG: false
 
+      # Filesystem Configuration
+      FILESYSTEM_DISK: public_direct
+
       # App Settings
       DEFAULT_MAX_DISTANCE: 50
       GHOST_MODE_ENABLED: true
