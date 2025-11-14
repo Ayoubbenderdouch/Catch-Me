@@ -23,6 +23,11 @@ Route::get('/', function () {
     return redirect()->route('admin.login');
 });
 
+// Redirect /admin to admin login
+Route::get('/admin', function () {
+    return redirect()->route('admin.login');
+});
+
 // Public legal pages (for app compliance)
 Route::prefix('legal')->group(function () {
     Route::get('/', function () {
