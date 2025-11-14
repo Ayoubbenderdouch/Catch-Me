@@ -18,6 +18,16 @@ return [
             'throw' => false,
         ],
 
+        // Direct public storage - writes directly to public/ folder
+        // Use this for Laravel Cloud where storage/ symlink doesn't work
+        'public_direct' => [
+            'driver' => 'local',
+            'root' => public_path(),
+            'url' => env('APP_URL'),
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

@@ -102,9 +102,9 @@ class UserController extends Controller
             ], 400);
         }
 
-        // ALWAYS use 'public' disk to ensure images are accessible via /storage/ URL
-        // The 'public' disk stores in storage/app/public which is symlinked to public/storage
-        $disk = 'public';
+        // Use 'public_direct' disk for Laravel Cloud compatibility
+        // This stores images directly in public/profile-images/ (no symlink needed)
+        $disk = 'public_direct';
 
         // Upload new image
         $path = $request->file('image')->store('profile-images', $disk);
@@ -152,8 +152,8 @@ class UserController extends Controller
         }
 
         $user = $request->user();
-        // ALWAYS use 'public' disk
-        $disk = 'public';
+        // Use 'public_direct' disk for Laravel Cloud compatibility
+        $disk = 'public_direct';
 
         // Delete old profile image from storage if exists
         if ($user->profile_image) {
@@ -214,10 +214,10 @@ class UserController extends Controller
         $photoUrl = $photos[$index];
 
         // Extract path from URL for storage deletion
-        // ALWAYS use 'public' disk
-        $disk = 'public';
+        // Use 'public_direct' disk for Laravel Cloud compatibility
+        $disk = 'public_direct';
         $urlPath = parse_url($photoUrl, PHP_URL_PATH);
-        $storagePath = str_replace('/storage/', '', $urlPath);
+        $storagePath = ltrim($urlPath, '/'); // Remove leading slash for public_direct disk
 
         // Delete from storage
         if (Storage::disk($disk)->exists($storagePath)) {
