@@ -1,0 +1,3 @@
+<svg class="w-6 h-6 text-gray-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
+  <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/>
+</svg><?php /**PATH /Users/macbook/Desktop/Catch Me/Catch Me Dashbaord/storage/framework/views/80ed9fee73f3679167917e3a56b0cd51.blade.php ENDPATH**/ ?>
