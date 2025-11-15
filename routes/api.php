@@ -32,10 +32,17 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
 
     // User profile
     Route::prefix('user')->group(function () {
-        Route::put('profile', [UserController::class, 'updateProfile']);
-        Route::post('profile-image', [UserController::class, 'uploadProfileImage']);
-        Route::post('main-photo', [UserController::class, 'updateMainPhoto']);
-        Route::delete('photos/{index}', [UserController::class, 'deletePhoto']);
+        // Profile updates: Max 10 per minute to prevent abuse
+        Route::put('profile', [UserController::class, 'updateProfile'])
+            ->middleware('throttle:10,1');
+
+        // Image uploads: Max 5 per minute (resource intensive)
+        Route::post('profile-image', [UserController::class, 'uploadProfileImage'])
+            ->middleware('throttle:5,1');
+        Route::post('main-photo', [UserController::class, 'updateMainPhoto'])
+            ->middleware('throttle:5,1');
+        Route::delete('photos/{index}', [UserController::class, 'deletePhoto'])
+            ->middleware('throttle:10,1');
 
         // Location updates: Max 6 per minute (every 10 seconds)
         // This prevents database overload from too frequent updates

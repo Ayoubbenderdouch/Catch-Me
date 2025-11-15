@@ -42,7 +42,7 @@ class UserController extends Controller
     public function updateProfile(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|string|max:255',
+            'name' => 'sometimes|string|max:255|regex:/^[a-zA-Z0-9\s\-\_]+$/u',
             'bio' => 'sometimes|string|max:500',
             'gender' => 'sometimes|in:male,female,other',
             'language' => 'sometimes|in:fr,ar',
@@ -55,7 +55,17 @@ class UserController extends Controller
         }
 
         $user = $request->user();
-        $user->update($request->only(['name', 'bio', 'gender', 'language', 'account_type', 'is_visible']));
+
+        // Sanitize input to prevent XSS attacks
+        $data = $request->only(['name', 'bio', 'gender', 'language', 'account_type', 'is_visible']);
+        if (isset($data['name'])) {
+            $data['name'] = strip_tags($data['name']);
+        }
+        if (isset($data['bio'])) {
+            $data['bio'] = strip_tags($data['bio']);
+        }
+
+        $user->update($data);
 
         return response()->json([
             'message' => __('messages.profile_updated'),
@@ -83,7 +93,7 @@ class UserController extends Controller
     public function uploadProfileImage(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:5120', // 5MB limit
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:5120|dimensions:min_width=100,min_height=100,max_width=4096,max_height=4096',
         ]);
 
         if ($validator->fails()) {
@@ -102,12 +112,24 @@ class UserController extends Controller
             ], 400);
         }
 
+        // Additional security: Verify it's actually an image
+        $file = $request->file('image');
+        $mimeType = $file->getMimeType();
+        $allowedMimes = ['image/jpeg', 'image/png', 'image/jpg'];
+
+        if (!in_array($mimeType, $allowedMimes)) {
+            return response()->json([
+                'message' => __('Invalid file type. Only JPEG and PNG are allowed.'),
+            ], 400);
+        }
+
         // Use 'public_direct' disk for Laravel Cloud compatibility
         // This stores images directly in public/profile-images/ (no symlink needed)
         $disk = 'public_direct';
 
-        // Upload new image
-        $path = $request->file('image')->store('profile-images', $disk);
+        // Upload new image with secure filename
+        $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs('profile-images', $filename, $disk);
         $imageUrl = Storage::disk($disk)->url($path);
 
         // Add to photos array
@@ -144,7 +166,7 @@ class UserController extends Controller
     public function updateMainPhoto(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:5120', // 5MB limit
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:5120|dimensions:min_width=100,min_height=100,max_width=4096,max_height=4096',
         ]);
 
         if ($validator->fails()) {
@@ -152,18 +174,33 @@ class UserController extends Controller
         }
 
         $user = $request->user();
+
+        // Additional security: Verify it's actually an image
+        $file = $request->file('image');
+        $mimeType = $file->getMimeType();
+        $allowedMimes = ['image/jpeg', 'image/png', 'image/jpg'];
+
+        if (!in_array($mimeType, $allowedMimes)) {
+            return response()->json([
+                'message' => __('Invalid file type. Only JPEG and PNG are allowed.'),
+            ], 400);
+        }
+
         // Use 'public_direct' disk for Laravel Cloud compatibility
         $disk = 'public_direct';
 
         // Delete old profile image from storage if exists
         if ($user->profile_image) {
-            if (Storage::disk($disk)->exists($user->profile_image)) {
-                Storage::disk($disk)->delete($user->profile_image);
+            // Security: Ensure the path doesn't contain directory traversal
+            $safePath = str_replace(['../', '..\\'], '', $user->profile_image);
+            if (Storage::disk($disk)->exists($safePath)) {
+                Storage::disk($disk)->delete($safePath);
             }
         }
 
-        // Upload new profile image
-        $path = $request->file('image')->store('profile-images', $disk);
+        // Upload new profile image with secure filename
+        $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs('profile-images', $filename, $disk);
         $imageUrl = Storage::disk($disk)->url($path);
 
         // Update ONLY profile_image field (NOT photos array!)
@@ -218,6 +255,16 @@ class UserController extends Controller
         $disk = 'public_direct';
         $urlPath = parse_url($photoUrl, PHP_URL_PATH);
         $storagePath = ltrim($urlPath, '/'); // Remove leading slash for public_direct disk
+
+        // Security: Prevent directory traversal attacks
+        $storagePath = str_replace(['../', '..\\'], '', $storagePath);
+
+        // Security: Ensure the path is within the profile-images directory
+        if (!str_contains($storagePath, 'profile-images')) {
+            return response()->json([
+                'message' => __('Invalid photo path'),
+            ], 400);
+        }
 
         // Delete from storage
         if (Storage::disk($disk)->exists($storagePath)) {

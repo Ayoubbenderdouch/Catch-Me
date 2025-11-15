@@ -39,7 +39,7 @@ class MessageController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'receiver_id' => 'required|exists:users,id',
-            'message' => 'required|string|max:1000',
+            'message' => 'required|string|max:1000|min:1',
         ]);
 
         if ($validator->fails()) {
@@ -54,6 +54,19 @@ class MessageController extends Controller
             return response()->json([
                 'message' => __('messages.cannot_message_yourself'),
             ], 400);
+        }
+
+        // Check if receiver is blocked or has blocked sender
+        $isBlocked = \App\Models\BlockedUser::where(function ($query) use ($sender, $receiverId) {
+            $query->where('blocker_id', $sender->id)->where('blocked_id', $receiverId);
+        })->orWhere(function ($query) use ($sender, $receiverId) {
+            $query->where('blocker_id', $receiverId)->where('blocked_id', $sender->id);
+        })->exists();
+
+        if ($isBlocked) {
+            return response()->json([
+                'message' => __('Cannot send messages to this user'),
+            ], 403);
         }
 
         // Check if they are matched (both accepted each other's likes)
@@ -71,11 +84,21 @@ class MessageController extends Controller
             ], 403);
         }
 
+        // Sanitize message to prevent XSS attacks
+        $sanitizedMessage = strip_tags(trim($request->message));
+
+        // Prevent empty messages after sanitization
+        if (empty($sanitizedMessage)) {
+            return response()->json([
+                'message' => __('Message cannot be empty'),
+            ], 400);
+        }
+
         // Create message with 'sent' status (one checkmark)
         $message = Message::create([
             'sender_id' => $sender->id,
             'receiver_id' => $receiverId,
-            'message' => $request->message,
+            'message' => $sanitizedMessage,
             'status' => 'sent', // WhatsApp-style: starts with one checkmark
         ]);
 
