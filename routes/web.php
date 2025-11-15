@@ -41,6 +41,14 @@ Route::prefix('legal')->group(function () {
 // Admin authentication routes (Laravel Breeze)
 require __DIR__ . '/auth.php';
 
+// Admin root redirect - redirect /admin to dashboard if logged in, or to login if not
+Route::get('/admin', function () {
+    if (auth('admin')->check()) {
+        return redirect()->route('admin.dashboard');
+    }
+    return redirect()->route('admin.login');
+})->name('admin');
+
 // Admin protected routes
 Route::middleware(['auth:admin'])->prefix('admin')->name('admin.')->group(function () {
     // Dashboard
